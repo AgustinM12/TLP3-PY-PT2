@@ -1,8 +1,9 @@
 import sqlite3
 import csv
+import os
 
 # ? Creacion y conexion a la base de datos
-def db_functions():
+def db_creation():
     connection = sqlite3.connect('tp2_py.db')
     # * Creacion de un cursor para ejecutar comandos SQL
     cursor = connection.cursor()
@@ -30,13 +31,14 @@ def open_file(file):
             
             reader = csv.reader(local_csv)
 
-            # * guardar en variables los datos de cada fila para insertar en la base de datos
-            for fila in reader:
-                provincia = fila[0]
-                id_provincia = fila[1]
-                localidad = fila[2]
-                codigo_postal = fila[3]
-                id_prov_mstr = fila[4]
+            # * guardar en variables los datos de cada columna para insertar en la base de datos
+            for columna in reader:
+                provincia = columna[0]
+                id_provincia = columna[1]
+                localidad = columna[2]
+                codigo_postal = columna[3]
+                id_prov_mstr = columna[4]
+
                 cursor.execute("INSERT INTO provincias (nombre, id_provincia, localidad, codigo_postal, id_prov_mstr) VALUES (?, ?, ?, ?, ?)", (provincia, id_provincia, localidad, codigo_postal, id_prov_mstr))
 
             # * cerrar la conexion a la base de datos
@@ -52,19 +54,39 @@ def open_file(file):
 
 # ? Funcion para exportar los datos de la base de datos a diferentes archivos CSV
 def export_csv():
-    connectDB = sqlite3.connect('tp2_py.db')
-    cursor = connectDB.cursor()
+    try:
+        # * verificar si la carpeta csv_files existe, si no, crearla
+        if not os.path.exists("csv_files"):
+            os.makedirs("csv_files")
 
-    # * obtener todos los datos de la tabla provincias
-    cursor.execute("SELECT * FROM provincias WHERE provincia = ")
-    table_data = cursor.fetchall()
+        # * conexion a la base de datos
+        connectDB = sqlite3.connect('tp2_py.db')
+        cursor = connectDB.cursor()
 
-    # * guardar los datos en un archivo CSV por provincia
-    for row in table_data:
-         with open(f"{row[0]}.csv", "w", newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(["nombre", "id_provincia", "localidad", "codigo_postal", "id_prov_mstr"])
-            writer.writerows(row)
+        # * obtener todos los nombres diferentes de la tabla provincias
+        cursor.execute("SELECT DISTINCT nombre FROM provincias")
+        lista_provincia = cursor.fetchall()
 
-    cursor.close()
-    connectDB.close()
+        # * eliminar la primer posicion que contiene el nombre de la columna
+        lista_provincia = lista_provincia[1:]
+
+        # * buscar los datos de las provincias
+        for provincia in lista_provincia:
+            cursor.execute("SELECT * FROM provincias WHERE nombre = ?", provincia)
+
+            # * formatear el nombre del archivo CSV
+            provincia = str(provincia)
+            provincia = provincia[2:-3]
+
+            provincia_data = cursor.fetchall()
+
+            # * escribir los datos de cada provincia en un archivo CSV en el directorio csv_files
+            with open(f"./csv_files/{provincia}.csv", "w", newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow(["id", "nombre", "id_provincia", "localidad", "codigo_postal", "id_prov_mstr"])
+                writer.writerows(provincia_data)
+
+        cursor.close()
+        connectDB.close()
+    except Exception as e:
+        print(f"Error: {e}")
